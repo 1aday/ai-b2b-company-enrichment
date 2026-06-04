@@ -1,0 +1,47 @@
+{
+  "name": "capital-source-enrichment",
+  "version": "0.1.0",
+  "description": "Scrape-first LLM enrichment workflow for identifying VC fundraise capital-source targets.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1aday/capital-source-enrichment.git"
+  },
+  "bugs": {
+    "url": "https://github.com/1aday/capital-source-enrichment/issues"
+  },
+  "homepage": "https://github.com/1aday/capital-source-enrichment#readme",
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "enrichment",
+    "llm",
+    "scraping",
+    "markdown",
+    "openrouter",
+    "venture-capital",
+    "capital-sources"
+  ],
+  "scripts": {
+    "flow": "tsx src/run-csv-scrape-enrich-flow.ts",
+    "flow:screen": "bash scripts/run-flow-screen.sh",
+    "scrape": "tsx src/enrich-investor-companies-master.ts",
+    "packets": "tsx src/prepare-company-llm-packets.ts",
+    "enrich": "tsx src/enrich-prepared-packets.ts",
+    "benchmark": "tsx src/benchmark-site-md-models.ts",
+    "verify:benchmark": "tsx src/verify-site-md-benchmark.ts",
+    "ui": "cd ui && ENRICHMENT_ROOT=.. npm run dev",
+    "restore:pre-cleanup": "bash scripts/restore-cleanup-backup.sh",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "csv-parse": "^6.2.1",
+    "tsx": "^4.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
