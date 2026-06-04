@@ -1,0 +1,4 @@
+source_record_id,company_name,domain,website_url,city,state,country
+sample-001,Hamilton Lane,hamiltonlane.com,https://www.hamiltonlane.com,Conshohocken,PA,United States
+sample-002,Hallador,hallador.com,https://www.hallador.com,Reno,NV,United States
+sample-003,Example Operating Company,example.com,https://example.com,New York,NY,United States
