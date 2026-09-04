@@ -26,5 +26,14 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Deterministic tests
+        run: npm test
+
+      - name: Company fixture
+        run: npm run fixture -- --outdir=/tmp/company-fixture
+
+      - name: Capital-source fixture
+        run: npm run fixture:capital-source -- --outdir=/tmp/capital-source-fixture
+
       - name: Dry run orchestration
         run: npm run flow -- --input=examples/input.sample.csv --dry-run=true --limit=2

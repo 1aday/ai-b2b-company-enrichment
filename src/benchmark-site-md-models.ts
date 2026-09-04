@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { ENRICHMENT_FIELD_FILLING_CONTRACT } from "./field-contract.js";
-import { ENRICHMENT_OUTPUT_SCHEMA } from "./schema.js";
+import { getPreset } from "./presets/index.js";
 import { compact, ensureDir, loadLocalEnv, nowStamp, numberValue, parseArgs, parseJsonObject, slug, writeCsv, writeJson } from "./shared.js";
 
 type PacketCase = {
@@ -86,11 +86,12 @@ type CaseScore = {
 const args = parseArgs(process.argv.slice(2));
 const rootDir = process.cwd();
 loadLocalEnv(rootDir);
+const preset = getPreset(args.preset);
 
-const currentRunPath = path.join(rootDir, "data", "investor_company_enrichment", "current-run.json");
+const currentRunPath = path.join(rootDir, "data", "company_enrichment", "current-run.json");
 const currentRun = existsSync(currentRunPath) ? JSON.parse(readFileSync(currentRunPath, "utf8")) as { run_dir?: string } : {};
-const sourceRunDir = path.resolve(args["run-dir"] ?? currentRun.run_dir ?? "");
-if (!sourceRunDir || !existsSync(sourceRunDir)) throw new Error(`Run dir not found: ${sourceRunDir || "<empty>"}`);
+const sourceRunDir = path.resolve(args["run-dir"] ?? currentRun.run_dir ?? ".");
+if (!args["packet-root"] && !existsSync(sourceRunDir)) throw new Error(`Run dir not found: ${sourceRunDir}`);
 
 const phase = args.phase ?? "all";
 const caseLimit = Math.max(1, numberValue(args.cases, 20));
@@ -110,7 +111,7 @@ const allCheaper = args["all-cheaper"] === "true";
 const candidateLimit = allCheaper ? 0 : Math.max(1, candidateLimitRaw);
 const minQualityForCheapPick = Math.max(0, Math.min(1, numberValue(args["min-quality"], 0.78)));
 const force = args.force === "true";
-const preparePackets = args.prepare !== "false";
+const preparePackets = args.prepare === "true" || (!args["packet-root"] && args.prepare !== "false");
 const fallbackJsonObject = args["fallback-json-object"] !== "false";
 const requireResponseFormat = args["require-response-format"] !== "false";
 const includeFree = args["include-free"] === "true";
@@ -120,8 +121,7 @@ const explicitModels = (args.models ?? "")
   .map((item) => item.trim())
   .filter(Boolean);
 
-const outputSchema = (ENRICHMENT_OUTPUT_SCHEMA as { schema?: unknown }).schema;
-if (!outputSchema || typeof outputSchema !== "object") throw new Error("ENRICHMENT_OUTPUT_SCHEMA.schema is not an object.");
+const outputSchema = preset.schema.schema;
 
 const BLOCKED_MODEL_PATTERNS = [
   /^~/,
@@ -129,43 +129,7 @@ const BLOCKED_MODEL_PATTERNS = [
   /(?:dall|stable-diffusion|midjourney|imagen|image|vision-only|whisper|tts|audio|music|lyria|clip|embedding|rerank|moderation|safeguard|guard)/i,
 ];
 
-const FIELD_WEIGHTS = [
-  { path: "canonical_name", weight: 3 },
-  { path: "domain", weight: 3 },
-  { path: "website_url", weight: 2 },
-  { path: "logo_url", weight: 1 },
-  { path: "type", weight: 6 },
-  { path: "verification.is_capital_source", weight: 6 },
-  { path: "verification.status", weight: 5 },
-  { path: "verification.confidence_score", weight: 2 },
-  { path: "profile.one_line_description", weight: 3 },
-  { path: "profile.detailed_profile_summary", weight: 4 },
-  { path: "profile.hq_location", weight: 3 },
-  { path: "profile.address", weight: 4 },
-  { path: "profile.postal_code", weight: 4 },
-  { path: "profile.operating_geographies", weight: 3 },
-  { path: "profile.capital_source_context", weight: 4 },
-  { path: "profile.ownership_background", weight: 2 },
-  { path: "profile.public_principal_name", weight: 2 },
-  { path: "capital_profile.capital_role_summary", weight: 4 },
-  { path: "capital_profile.invests_in_vc_funds", weight: 6 },
-  { path: "capital_profile.invests_directly", weight: 5 },
-  { path: "capital_profile.co_investment_appetite", weight: 3 },
-  { path: "capital_profile.fund_commitment_appetite", weight: 6 },
-  { path: "capital_profile.preferred_fund_stage", weight: 3 },
-  { path: "capital_profile.emerging_manager_appetite", weight: 2 },
-  { path: "capital_profile.first_time_fund_appetite", weight: 2 },
-  { path: "capital_profile.fund_size_preference", weight: 2 },
-  { path: "capital_profile.sector_focus", weight: 4 },
-  { path: "capital_profile.stage_focus", weight: 4 },
-  { path: "capital_profile.geography_focus", weight: 4 },
-  { path: "capital_profile.business_model_preferences", weight: 3 },
-  { path: "capital_profile.impact_or_values_themes", weight: 2 },
-  { path: "portfolio_signals.known_fund_investments", weight: 3 },
-  { path: "portfolio_signals.known_direct_investments", weight: 3 },
-  { path: "outreach.fundraise_fit_notes", weight: 4 },
-  { path: "outreach.fit_risk_notes", weight: 3 },
-] as const;
+const FIELD_WEIGHTS = preset.benchmarkFields;
 
 ensureDir(outdir);
 ensureDir(path.join(outdir, "gold"));
@@ -182,12 +146,19 @@ async function main() {
   const packets = phase === "models" ? [] : loadPacketCases(packetRoot).slice(offset, offset + caseLimit);
   if (phase !== "models" && !packets.length) throw new Error(`No llm_input.md packets found in ${packetRoot}`);
 
+  if (phase === "prepare") {
+    writeSummary([], [], packets, []);
+    console.log(JSON.stringify({ run_id: runId, preset: preset.id, outdir, phase, packet_root: packetRoot, cases: packets.length, dry_run: dryRun }, null, 2));
+    return;
+  }
+
   const models = await fetchOpenRouterModels();
   writeJson(path.join(outdir, "models", "all_openrouter_models.json"), models);
   const selectedModels = selectCandidateModels(models, packets);
   writeJson(path.join(outdir, "models", "selected_candidate_models.json"), selectedModels);
   writeJson(path.join(outdir, "config.json"), {
     run_id: runId,
+    preset: preset.id,
     source_run_dir: sourceRunDir,
     packet_root: packetRoot,
     phase,
@@ -214,6 +185,7 @@ async function main() {
 
   console.log(JSON.stringify({
     run_id: runId,
+    preset: preset.id,
     outdir,
     phase,
     packet_root: packetRoot,
@@ -508,8 +480,8 @@ function buildRequestBody(model: string, prompt: string, structured: boolean) {
     ? {
         type: "json_schema",
         json_schema: {
-          name: "capital_source_enrichment",
-          strict: true,
+          name: preset.schema.name,
+          strict: preset.schema.strict,
           schema: outputSchema,
         },
       }
@@ -519,12 +491,7 @@ function buildRequestBody(model: string, prompt: string, structured: boolean) {
     messages: [
       {
         role: "system",
-        content: [
-          "You fill one capital-source enrichment JSON object from scraped first-party company-site markdown.",
-          "Use only the supplied markdown packet. Do not use CSV labels, bought-list type labels, or outside knowledge.",
-          "If a fact is not directly supported by the markdown, use unknown, null, [], or a conservative negative enum as required by the schema.",
-          "Return JSON only.",
-        ].join(" "),
+        content: preset.systemPrompt,
       },
       {
         role: "user",
@@ -538,12 +505,16 @@ function buildRequestBody(model: string, prompt: string, structured: boolean) {
 }
 
 function buildPrompt(packet: PacketCase, purpose: "gold" | "candidate") {
-  const contract = {
+  const contract = preset.id === "capital-source" ? {
     value_style: ENRICHMENT_FIELD_FILLING_CONTRACT.value_style,
     sensitive_field_rules: ENRICHMENT_FIELD_FILLING_CONTRACT.sensitive_field_rules,
     portfolio_rules: ENRICHMENT_FIELD_FILLING_CONTRACT.portfolio_rules,
     fit_assessment_rules: ENRICHMENT_FIELD_FILLING_CONTRACT.fit_assessment_rules,
     categorical_array_examples: ENRICHMENT_FIELD_FILLING_CONTRACT.categorical_array_examples,
+  } : {
+    account_level_only: true,
+    qualification: "Only score when an explicit ICP is supplied.",
+    evidence: "Support every material claim with a source URL from the packet.",
   };
   return [
     `Benchmark role: ${purpose === "gold" ? "create the gold-standard reference JSON" : "create the candidate JSON to compare against the gold standard"}.`,
@@ -568,8 +539,8 @@ async function postOpenRouter(apiKey: string, body: Record<string, unknown>) {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/1aday/capital-source-enrichment",
-        "X-Title": "Capital Source Site MD Model Benchmark",
+        "HTTP-Referer": "https://github.com/1aday/ai-b2b-company-enrichment",
+        "X-Title": "AI B2B Company Enrichment Benchmark",
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
@@ -813,30 +784,10 @@ function arrayTerms(value: unknown) {
 }
 
 function schemaShape(value: Record<string, unknown>) {
-  const rootRequired = [
-    "source_record_id",
-    "canonical_name",
-    "domain",
-    "website_url",
-    "logo_url",
-    "type",
-    "verification",
-    "profile",
-    "capital_profile",
-    "portfolio_signals",
-    "outreach",
-    "compliance",
-    "source_evidence",
-    "quality",
-  ];
-  const present = rootRequired.filter((key) => key in value).length / rootRequired.length;
-  const objectPaths = ["verification", "profile", "capital_profile", "portfolio_signals", "outreach", "compliance", "quality"];
-  const objects = objectPaths.filter((key) => {
-    const item = value[key];
-    return item && typeof item === "object" && !Array.isArray(item);
-  }).length / objectPaths.length;
-  const arrays = [value.source_evidence].filter(Array.isArray).length;
-  return present * 0.72 + objects * 0.22 + arrays * 0.06;
+  if (preset.validate(value).ok) return 1;
+  const required = Array.isArray(outputSchema.required) ? outputSchema.required.map(String) : [];
+  if (!required.length) return 0;
+  return required.filter((key) => key in value).length / required.length * 0.8;
 }
 
 function valueAt(value: Record<string, unknown>, pathValue: string): unknown {

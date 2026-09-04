@@ -3,7 +3,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { fetchMarkdownPage, type MarkdownPage } from "./markdown-scrape.js";
-import { DEFAULT_INVESTOR_COMPANIES_SOURCE_CSV, compact, csvEscape, ensureDir, normalizeDomain, nowStamp, numberValue, parseArgs, readCsv, slug, text, writeJson } from "./shared.js";
+import { additionalSourceContext, validateCompanySourceRows } from "./input.js";
+import { DEFAULT_SOURCE_CSV, compact, csvEscape, ensureDir, normalizeDomain, nowStamp, numberValue, parseArgs, readCsv, slug, text, writeJson } from "./shared.js";
 
 type RawRow = Record<string, string>;
 
@@ -38,6 +39,7 @@ type Entity = {
   rank_1_contact_count: string;
   rank_2_contact_count: string;
   corporate_priority_contact_count: string;
+  source_context: Record<string, string>;
 };
 
 type SourceResult = {
@@ -101,6 +103,7 @@ type EntityResult = {
   rank_1_contact_count: string;
   rank_2_contact_count: string;
   corporate_priority_contact_count: string;
+  source_context: Record<string, string>;
   sources: SourceResult[];
   source_evidence: string;
 };
@@ -136,9 +139,9 @@ type ProgressSnapshot = {
 
 const args = parseArgs(process.argv.slice(2));
 const rootDir = process.cwd();
-const inputPath = path.resolve(args.input ?? DEFAULT_INVESTOR_COMPANIES_SOURCE_CSV);
-const outdir = path.resolve(args.outdir ?? path.join(rootDir, "data", "investor_company_enrichment", "runs"));
-const runId = args["run-id"] ?? `investor-companies-${nowStamp()}`;
+const inputPath = path.resolve(args.input ?? DEFAULT_SOURCE_CSV);
+const outdir = path.resolve(args.outdir ?? path.join(rootDir, "data", "company_enrichment", "runs"));
+const runId = args["run-id"] ?? `companies-${nowStamp()}`;
 const runDir = path.join(outdir, runId);
 const markdownDir = path.join(runDir, "markdown");
 const limit = numberValue(args.limit, 0);
@@ -151,7 +154,7 @@ const maxHtmlChars = Math.max(10_000, numberValue(args["max-html-chars"], 900_00
 const terminalEvery = Math.max(1, numberValue(args["terminal-every"], 50));
 const progressEvery = Math.max(1, numberValue(args["progress-every"], 25));
 const cloudflareBucket = text(args["cloudflare-bucket"] ?? "");
-const cloudflarePrefix = text(args["cloudflare-prefix"] ?? `investor-company-enrichment/${runId}`);
+const cloudflarePrefix = text(args["cloudflare-prefix"] ?? `company-enrichment/${runId}`);
 const cloudflareSyncEvery = Math.max(0, numberValue(args["cloudflare-sync-every"], 500));
 const sitePages = unique((args["site-pages"] ?? "home").split(",").map((item) => item.trim().toLowerCase()).filter(Boolean));
 const scrapeNavPages = args["scrape-nav-pages"] !== "false";
@@ -162,6 +165,7 @@ ensureDir(markdownDir);
 ensureDir(path.dirname(currentRunPath()));
 
 const rawRows = readCsv(inputPath) as RawRow[];
+validateCompanySourceRows(rawRows);
 const entities = rawRows.map(normalizeEntity).filter((entity) => entity.domain || entity.website_url || entity.company_name);
 const selectedEntities = limit > 0 ? entities.slice(offset, offset + limit) : entities.slice(offset);
 
@@ -180,7 +184,7 @@ const entityCsvHeaders = [
   "full_address", "postal_code", "address_source", "address_confidence", "city", "state", "country", "latitude", "longitude",
   "phone_number", "company_emails_all", "linkedin_url", "description", "industry_primary", "investor_type", "classification_notes",
   "employee_count_range", "employee_count", "founded_year", "revenue_range", "total_revenue", "final_contact_count",
-  "rank_1_contact_count", "rank_2_contact_count", "corporate_priority_contact_count", "source_evidence",
+  "rank_1_contact_count", "rank_2_contact_count", "corporate_priority_contact_count", "source_context", "source_evidence",
 ];
 const sourceCsvHeaders = [
   "run_id", "row_index", "company_name", "domain", "source_type", "source_family", "reason", "requested_url", "final_url",
@@ -275,7 +279,7 @@ async function enrichEntity(entity: Entity): Promise<EntityResult> {
     const currentIndex = sourceIndex++;
     const source = queue[currentIndex];
     if (!source) continue;
-    const page = await fetchMarkdownPage(source.url, { timeoutMs, maxHtmlChars, maxMarkdownChars, userAgent: "capital-source-enrichment/0.1" });
+    const page = await fetchMarkdownPage(source.url, { timeoutMs, maxHtmlChars, maxMarkdownChars, userAgent: "ai-b2b-company-enrichment/0.1" });
     const markdownFile = markdownFileFor(entity, currentIndex, source, page);
     if (page.markdown) {
       const markdownPath = path.join(runDir, markdownFile);
@@ -391,6 +395,7 @@ function makeEntityResult(entity: Entity, sources: SourceResult[], status: "comp
     rank_1_contact_count: entity.rank_1_contact_count,
     rank_2_contact_count: entity.rank_2_contact_count,
     corporate_priority_contact_count: entity.corporate_priority_contact_count,
+    source_context: entity.source_context,
     sources,
     source_evidence: okSources.slice(0, 4).map((source) => `${source.source_family || source.source_type}: ${source.final_url || source.requested_url}`).join(" | "),
   };
@@ -480,8 +485,8 @@ function normalizeEntity(row: RawRow, index: number): Entity {
   const domain = normalizeDomain(row.domain || row.normalized_domain || row.website_url);
   return {
     row_index: index,
-    source_record_id: text(row.primary_source_id) || domain || `row-${index + 1}`,
-    company_name: text(row.company_name) || domain || `row-${index + 1}`,
+    source_record_id: text(row.source_record_id),
+    company_name: text(row.company_name),
     legal_name: text(row.legal_name),
     domain,
     website_url: firstUrlLike(row.website_url) || domainToUrl(domain),
@@ -509,6 +514,7 @@ function normalizeEntity(row: RawRow, index: number): Entity {
     rank_1_contact_count: text(row.rank_1_contact_count),
     rank_2_contact_count: text(row.rank_2_contact_count),
     corporate_priority_contact_count: text(row.corporate_priority_contact_count),
+    source_context: additionalSourceContext(row),
   };
 }
 
@@ -609,6 +615,7 @@ function markdownWithPageHeader(entity: Entity, source: { source_type: string; s
     domain: entity.domain,
     website_url: entity.website_url,
     investor_type: entity.investor_type,
+    source_context: entity.source_context,
     csv_city: entity.city,
     csv_state: entity.state,
     csv_country: entity.country,
@@ -822,7 +829,7 @@ function writeEvent(event: string, details: Record<string, unknown>) {
 }
 
 function currentRunPath() {
-  return path.join(rootDir, "data", "investor_company_enrichment", "current-run.json");
+  return path.join(rootDir, "data", "company_enrichment", "current-run.json");
 }
 
 function firstUrlLike(value: unknown) {
