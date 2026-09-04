@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Capital Signal Enrichment Console",
-  description: "Live investor company enrichment progress and results",
+  title: "SignalForge — Evidence-backed B2B company enrichment",
+  description: "Sample dashboard for evidence-backed company profiles, commercial signals, and optional ICP qualification.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
