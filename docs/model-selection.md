@@ -1,59 +1,38 @@
 # Model selection
 
-The workflow is designed to compare cheap models against the same packet corpus.
+The benchmark compares models against the same evidence packets and a chosen gold output. Preset-defined field weights keep evaluation aligned with the product being tested.
 
-## Default model
-
-```text
-nvidia/nemotron-3-super-120b-a12b
-```
-
-Override with:
+## Prepare without model spend
 
 ```bash
-npm run enrich -- \
-  --packet-root=/path/to/prepared_for_llm \
-  --model=qwen/qwen3.5-flash-02-23
+npm run benchmark -- \
+  --packet-root=examples/fixtures/prepared_for_llm \
+  --phase=prepare \
+  --dry-run=true
 ```
 
-## What to measure
+## Real comparison
 
-- Cost per packet.
-- Average latency.
-- Parse success rate.
-- Strict usable JSON rate.
-- Accepted target quality.
-- False-positive rate among accepted targets.
-- False-negative risk among rejected or skipped records.
-- Field fill quality for address, logo, capital profile, sectors, stages, and geography.
+```bash
+npm run benchmark -- \
+  --preset=company \
+  --run-dir=/absolute/path/to/scrape-run \
+  --cases=20 \
+  --gold-model=openai/gpt-4.1 \
+  --candidate-limit=8
+```
 
-## Cheap-model strategy
+Benchmark the historical workflow with `npm run benchmark:capital-source` and the same flags.
 
-1. Scrape once.
-2. Prepare packets once.
-3. Run candidate models against the same packet root.
-4. Keep raw responses.
-5. Compare strict parse rate before manual quality.
-6. Manually review accepted positives before scaling.
+## Decision fields
 
-## Prompt adjustment themes
+- valid structured-response rate;
+- weighted agreement with the gold record;
+- recall on gold-known fields;
+- evidence and schema completeness;
+- average and total latency;
+- average and total provider cost.
 
-If a model rejects too much:
+The cheapest model is not automatically the winner. A model is eligible only after it clears the configured quality and parse thresholds for the full case set.
 
-- Make the valid target taxonomy explicit.
-- Clarify that allocators, fund-of-funds, foundations, endowments, pensions, private banks, OCIOs, and discretionary platforms can be valid targets.
-- Broaden keyword prefiltering before changing final classification.
-
-If a model accepts too much:
-
-- Emphasize that direct startup investing alone is not enough.
-- Require evidence that the entity can commit capital to funds, managers, or alternative vehicles.
-- Keep rejection reasons short and decisive.
-
-If a model returns malformed JSON:
-
-- Reduce packet size.
-- Increase retries.
-- Lower max pages per company.
-- Increase `--max-output-tokens`.
-- Prefer models with stronger JSON obedience even if token price is slightly higher.
+The public dashboard deliberately marks paid candidates as not run. Add claims only after a reproducible benchmark artifact exists.

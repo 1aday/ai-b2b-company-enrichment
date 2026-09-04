@@ -9,11 +9,11 @@ for arg in "$@"; do
 done
 
 if [[ -z "$run_id" ]]; then
-  run_id="capital-source-$(date -u +%Y%m%dT%H%M%SZ)"
+  run_id="company-enrichment-$(date -u +%Y%m%dT%H%M%SZ)"
   set -- "$@" "--run-id=${run_id}"
 fi
 
-session="capital-source-${run_id//[^A-Za-z0-9_-]/-}"
+session="company-enrichment-${run_id//[^A-Za-z0-9_-]/-}"
 printf -v quoted_cwd "%q" "$(pwd)"
 printf -v quoted_args " %q" "$@"
 cmd="cd ${quoted_cwd} && npm run flow --${quoted_args}"

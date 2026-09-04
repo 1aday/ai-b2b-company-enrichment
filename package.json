@@ -1,17 +1,17 @@
 {
-  "name": "capital-source-enrichment",
+  "name": "ai-b2b-company-enrichment",
   "version": "0.1.0",
-  "description": "Scrape-first LLM enrichment workflow for identifying VC fundraise capital-source targets.",
+  "description": "Evidence-backed AI enrichment for B2B company accounts with optional ICP scoring.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/1aday/capital-source-enrichment.git"
+    "url": "https://github.com/1aday/ai-b2b-company-enrichment.git"
   },
   "bugs": {
-    "url": "https://github.com/1aday/capital-source-enrichment/issues"
+    "url": "https://github.com/1aday/ai-b2b-company-enrichment/issues"
   },
-  "homepage": "https://github.com/1aday/capital-source-enrichment#readme",
+  "homepage": "https://github.com/1aday/ai-b2b-company-enrichment#readme",
   "engines": {
     "node": ">=22"
   },
@@ -21,20 +21,31 @@
     "scraping",
     "markdown",
     "openrouter",
-    "venture-capital",
-    "capital-sources"
+    "b2b",
+    "company-enrichment",
+    "lead-enrichment",
+    "sales-intelligence",
+    "typescript"
   ],
   "scripts": {
-    "flow": "tsx src/run-csv-scrape-enrich-flow.ts",
+    "flow": "tsx src/run-company-enrichment-flow.ts --preset=company",
+    "flow:capital-source": "tsx src/run-company-enrichment-flow.ts --preset=capital-source",
+    "fixture": "tsx src/run-company-enrichment-flow.ts --preset=company --provider=fixture",
+    "fixture:icp": "tsx src/run-company-enrichment-flow.ts --preset=company --provider=fixture --icp=examples/icp.sample.json",
+    "fixture:capital-source": "tsx src/run-company-enrichment-flow.ts --preset=capital-source --provider=fixture",
     "flow:screen": "bash scripts/run-flow-screen.sh",
-    "scrape": "tsx src/enrich-investor-companies-master.ts",
+    "scrape": "tsx src/scrape-company-websites.ts",
     "packets": "tsx src/prepare-company-llm-packets.ts",
-    "enrich": "tsx src/enrich-prepared-packets.ts",
-    "benchmark": "tsx src/benchmark-site-md-models.ts",
+    "enrich": "tsx src/enrich-company-packets.ts --preset=company",
+    "enrich:capital-source": "tsx src/enrich-prepared-packets.ts",
+    "benchmark": "tsx src/benchmark-site-md-models.ts --preset=company",
+    "benchmark:capital-source": "tsx src/benchmark-site-md-models.ts --preset=capital-source",
     "verify:benchmark": "tsx src/verify-site-md-benchmark.ts",
-    "ui": "cd ui && ENRICHMENT_ROOT=.. npm run dev",
+    "ui": "cd ui && npm run dev",
+    "ui:build": "cd ui && npm ci && env -u NODE_ENV npm run build",
     "restore:pre-cleanup": "bash scripts/restore-cleanup-backup.sh",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/tests/*.test.ts"
   },
   "dependencies": {
     "csv-parse": "^6.2.1",

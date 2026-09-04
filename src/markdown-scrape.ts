@@ -43,7 +43,7 @@ export async function fetchMarkdownPage(url: string, options: MarkdownFetchOptio
       signal: controller.signal,
       redirect: "follow",
       headers: {
-        "user-agent": options.userAgent ?? "capital-source-enrichment-markdown-scrape/0.1",
+        "user-agent": options.userAgent ?? "ai-b2b-company-enrichment/0.1",
         accept: "text/html,application/xhtml+xml,text/plain;q=0.8,*/*;q=0.2",
       },
     });
@@ -98,7 +98,7 @@ async function tryInsecureTlsFetch(url: string, options: MarkdownFetchOptions, m
     const response = await fetchTextWithInsecureTls(url, {
       timeoutMs: Math.max(500, options.timeoutMs ?? 8000),
       maxHtmlChars,
-      userAgent: options.userAgent ?? "capital-source-enrichment-markdown-scrape/0.1",
+      userAgent: options.userAgent ?? "ai-b2b-company-enrichment/0.1",
     });
     const assets = extractPageAssets(response.body, response.finalUrl);
     const links = extractPageLinks(response.body, response.finalUrl);

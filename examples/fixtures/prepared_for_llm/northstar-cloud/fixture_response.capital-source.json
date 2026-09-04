@@ -1,0 +1,26 @@
+{
+  "source_record_id": "demo-001",
+  "canonical_name": "Northstar Cloud",
+  "domain": "northstarcloud.example",
+  "type": "not_lp_target",
+  "verification": {
+    "status": "rejected",
+    "is_capital_source": false,
+    "confidence_score": 0.98,
+    "rationale": "The supplied evidence describes a software vendor, not a capital allocator."
+  },
+  "profile": {
+    "website_url": "https://northstarcloud.example"
+  },
+  "capital_profile": {
+    "invests_in_vc_funds": "unknown"
+  },
+  "source_evidence": [
+    {
+      "claim": "The company provides infrastructure observability software.",
+      "source_url": "https://northstarcloud.example/platform",
+      "source_type": "official_website",
+      "confidence_score": 0.97
+    }
+  ]
+}

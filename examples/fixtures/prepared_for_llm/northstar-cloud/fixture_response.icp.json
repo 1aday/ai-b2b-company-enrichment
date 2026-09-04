@@ -1,0 +1,68 @@
+{
+  "source_record_id": "demo-001",
+  "identity": {
+    "canonical_name": "Northstar Cloud",
+    "legal_name": "",
+    "domain": "northstarcloud.example",
+    "website_url": "https://northstarcloud.example",
+    "logo_url": "",
+    "one_line_description": "Infrastructure observability software for B2B SaaS engineering teams."
+  },
+  "firmographics": {
+    "primary_industry": "Cloud infrastructure software",
+    "secondary_industries": ["Observability", "Developer tools"],
+    "business_model": "b2b",
+    "company_type": "software",
+    "employee_range": "",
+    "revenue_range": "",
+    "founded_year": null,
+    "headquarters": {
+      "city": "",
+      "region": "",
+      "country": "",
+      "full_address": ""
+    },
+    "operating_geographies": ["Canada", "United States"]
+  },
+  "offering": {
+    "products_and_services": ["Service health monitoring", "Incident investigation", "Cloud cost controls"],
+    "target_customers": ["Growing B2B SaaS engineering teams"],
+    "value_proposition": "Helps engineering teams monitor service health, investigate incidents, and control cloud costs.",
+    "differentiators": []
+  },
+  "commercial_signals": {
+    "growth_signals": [],
+    "hiring_signals": [],
+    "technology_signals": [],
+    "recent_events": []
+  },
+  "qualification": {
+    "status": "strong_fit",
+    "icp_score": 86,
+    "matched_criteria": ["B2B software", "Cloud infrastructure", "Operates in Canada and the United States"],
+    "gaps": ["Employee count is not evidenced"],
+    "disqualifiers": [],
+    "rationale": "The supplied evidence matches the industry, business model, geography, and cloud-operations criteria; company size remains unverified."
+  },
+  "outreach": {
+    "account_summary": "Northstar Cloud sells cloud operations software to growing B2B SaaS engineering teams.",
+    "likely_priorities": ["Service reliability", "Faster incident investigation", "Cloud cost control"],
+    "personalization_angles": ["Reference the documented focus on service health and cloud cost control."],
+    "risk_notes": ["Company size, revenue, and current buying activity are not evidenced."]
+  },
+  "source_evidence": [
+    {
+      "field": "qualification.matched_criteria",
+      "claim": "The company serves B2B SaaS engineering teams in Canada and the United States.",
+      "source_url": "https://northstarcloud.example/platform",
+      "source_type": "official_website",
+      "confidence_score": 0.97
+    }
+  ],
+  "quality": {
+    "confidence_score": 0.82,
+    "evidence_coverage_score": 0.66,
+    "missing_fields": ["legal_name", "employee_range", "revenue_range", "founded_year", "headquarters"],
+    "review_flags": ["Fictional deterministic fixture; not a real company record."]
+  }
+}

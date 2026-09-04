@@ -1,96 +1,80 @@
-# Operations runbook
+# Operations
 
-## Environment
-
-Required for paid enrichment:
+## No-cost checks
 
 ```bash
-OPENROUTER_API_KEY=...
-```
-
-Optional:
-
-```bash
-OPENAI_API_KEY=...
-```
-
-## Smoke checks
-
-No-cost compile check:
-
-```bash
+npm ci
 npm run typecheck
+npm test
+npm run fixture
+npm run fixture:icp
+npm run fixture:capital-source
+npm run flow -- --input=examples/input.sample.csv --dry-run=true --limit=2
+npm run flow:capital-source -- --input=examples/input.sample.csv --dry-run=true --limit=2
+npm run benchmark -- --packet-root=examples/fixtures/prepared_for_llm --phase=prepare --dry-run=true
+npm run ui:build
 ```
 
-No-cost orchestration check:
+## Paid provider setup
+
+Create an ignored `.env.local` in the repository root:
 
 ```bash
-npm run flow -- --input=examples/input.sample.csv --dry-run=true --limit=2
+OPENROUTER_API_KEY=your_key_here
 ```
 
-## Small paid run
+The static dashboard never reads this file.
+
+## Small company run
 
 ```bash
 npm run flow -- \
-  --input=/path/to/entities.csv \
-  --run-id=smoke-$(date +%Y%m%d-%H%M%S) \
-  --limit=20 \
-  --scrape-concurrency=8 \
-  --enrich-concurrency=4 \
-  --max-nav-pages=20
+  --input=/absolute/path/to/companies.csv \
+  --provider=openrouter \
+  --model=openai/gpt-4.1-mini \
+  --limit=5 \
+  --max-nav-pages=10 \
+  --scrape-concurrency=4 \
+  --enrich-concurrency=2
 ```
 
-## Production local run
+Add `--icp=/absolute/path/to/icp.json` only when the criteria are ready for scoring.
+
+## Capital-source preset
 
 ```bash
-npm run flow:screen -- \
-  --input=/path/to/entities.csv \
-  --run-id=capital-source-$(date +%Y%m%d-%H%M%S) \
-  --scrape-concurrency=12 \
-  --enrich-concurrency=4 \
-  --max-nav-pages=0
+npm run flow:capital-source -- \
+  --input=/absolute/path/to/companies.csv \
+  --provider=openrouter \
+  --limit=5
 ```
 
-Attach:
-
-```bash
-screen -r <session-name>
-```
+This path continues through `src/enrich-prepared-packets.ts`, preserving the established capital-source prompt, filter, schema, and output behavior.
 
 ## Important flags
 
-- `--limit=100`: process only the first 100 selected rows.
-- `--offset=200`: start from row offset 200.
-- `--max-nav-pages=0`: no artificial nav-page cap.
-- `--max-nav-pages=20`: bounded smoke crawl.
-- `--max-entity-ms=120000`: stop a single entity after 120 seconds.
-- `--scrape-concurrency=12`: concurrent entity scrapes.
-- `--enrich-concurrency=4`: concurrent model calls.
-- `--model=...`: OpenRouter model id.
-- `--retries=2`: malformed-response retry count.
-- `--max-output-tokens=12000`: response cap.
+- `--preset=company|capital-source`
+- `--provider=fixture|openrouter`
+- `--icp=/absolute/path/to/icp.json`
+- `--limit=20` and `--offset=0`
+- `--max-nav-pages=10`
+- `--max-entity-ms=120000`
+- `--scrape-concurrency=8`
+- `--enrich-concurrency=3`
+- `--model=<openrouter-model-id>`
+- `--retries=2`
+- `--max-output-tokens=8000`
+- `--dry-run=true`
 
-## Reading results
+## Scale gates
 
-Start with:
+Before increasing volume:
 
-```text
-runs/<run-id>/flow-manifest.json
-runs/<run-id>/llm-enrichment/summary.json
-runs/<run-id>/llm-enrichment/enriched.csv
-```
+1. Review empty and failed scrapes.
+2. Manually inspect a representative set of source packets.
+3. Review all accepted ICP matches and disqualifiers.
+4. Measure parse rate, evidence coverage, latency, and actual provider cost.
+5. Confirm the selected model supports strict response schemas.
+6. Set a retention policy for real source records and raw provider responses.
 
-Then inspect:
-
-```text
-runs/<run-id>/scrape-runs/<run-id>-scrape/prepared_for_llm/_quality_report.json
-runs/<run-id>/llm-enrichment/keyword-prefilter.json
-runs/<run-id>/llm-enrichment/responses/<model-slug>/
-```
-
-## Stop conditions
-
-- If many packets are skipped as empty, improve scrape coverage before changing the prompt.
-- If many responses are malformed, lower packet size or increase retries.
-- If accepted records look overbroad, tighten the system prompt and review accepted positives manually.
-- If likely targets are skipped before LLM, broaden keyword prefilter terms before scaling.
+Do not treat provider availability, price, or prior benchmark results as permanent.

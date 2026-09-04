@@ -1,0 +1,23 @@
+{
+  "entity": {
+    "source_record_id": "demo-001",
+    "company_name": "Northstar Cloud",
+    "domain": "northstarcloud.example",
+    "website_url": "https://northstarcloud.example",
+    "source_context": {
+      "campaign": "cloud-ops-demo",
+      "account_tier": "research"
+    }
+  },
+  "candidates": {},
+  "first_party_sources": [
+    {
+      "final_url": "https://northstarcloud.example/platform",
+      "clean_text": "Northstar Cloud provides infrastructure observability software for B2B SaaS engineering teams."
+    }
+  ],
+  "third_party_sources": [],
+  "quality": {
+    "source_coverage": 1
+  }
+}

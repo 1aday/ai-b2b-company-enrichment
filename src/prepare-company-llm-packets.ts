@@ -35,6 +35,7 @@ type CompanyIndex = {
   address_confidence: string;
   markdown_dir: string;
   pages: PageIndex[];
+  source_context?: Record<string, string>;
 };
 
 type ParsedPage = PageIndex & {
@@ -76,7 +77,7 @@ type PreparedSource = {
 
 const args = parseArgs(process.argv.slice(2));
 const rootDir = process.cwd();
-const currentRunPath = path.join(rootDir, "data", "investor_company_enrichment", "current-run.json");
+const currentRunPath = path.join(rootDir, "data", "company_enrichment", "current-run.json");
 const currentRun = existsSync(currentRunPath) ? JSON.parse(readFileSync(currentRunPath, "utf8")) as { run_dir?: string } : {};
 const runDir = path.resolve(args["run-dir"] ?? currentRun.run_dir ?? "");
 if (!runDir || !existsSync(runDir)) throw new Error(`Run dir not found: ${runDir || "<empty>"}`);
@@ -587,6 +588,7 @@ function entityBlock(index: CompanyIndex) {
     legal_name: index.legal_name,
     domain: index.domain,
     website_url: index.website_url,
+    source_context: index.source_context ?? {},
   };
 }
 

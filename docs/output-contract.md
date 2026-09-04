@@ -1,97 +1,50 @@
 # Output contract
 
-The workflow writes both source artifacts and final enrichment artifacts.
+## Company preset
 
-## Scrape artifacts
-
-```text
-scrape-runs/<run-id>-scrape/markdown/<company>/*.md
-scrape-runs/<run-id>-scrape/markdown/<company>/_company_index.json
-```
-
-Markdown files include:
-
-- Company identity.
-- Page name.
-- Page path.
-- Requested URL.
-- Final URL.
-- Fetch status.
-- Page content.
-
-`_company_index.json` includes:
-
-- Source inventory.
-- Logo URL and source.
-- Favicon URL and source.
-- Full address hint.
-- Postal-code hint.
-- Page summaries.
-
-## Packet artifacts
+The strict company object contains these required sections:
 
 ```text
-prepared_for_llm/<company>/llm_input.md
-prepared_for_llm/<company>/llm_input.json
-prepared_for_llm/<company>/clean/first_party_clean.md
-prepared_for_llm/<company>/clean/third_party_clean.md
-prepared_for_llm/_quality_report.json
+source_record_id
+identity
+firmographics
+offering
+commercial_signals
+qualification
+outreach
+source_evidence
+quality
 ```
 
-The LLM packet should contain enough scraped content for the model to fill the JSON, but it should not carry CSV classification labels as final truth.
+Important invariants:
 
-## Enrichment artifacts
+- `source_evidence` contains at least one cited claim.
+- identity name, domain, website, and description are non-empty.
+- confidence values are between 0 and 1.
+- no ICP means `qualification.status=not_scored` and `icp_score=null`.
+- an active ICP score is between 0 and 100.
+- company output contains no people or personal contact fields.
+
+See `src/presets/company.ts` for the complete JSON schema.
+
+## Capital-source preset
+
+The original `ENRICHMENT_OUTPUT_SCHEMA` from `src/schema.ts` remains the source of truth. Its verification, profile, capital profile, portfolio, outreach, compliance, evidence, and quality sections are unchanged by the general company preset.
+
+## Source-context preservation
+
+The four required CSV fields are mapped into identity. Every additional source column is retained in `entity.source_context` in the packet. The flattened company CSV prefixes those original columns with `source_` to distinguish input context from enriched claims.
+
+## Files
 
 ```text
-llm-enrichment/enriched.csv
-llm-enrichment/enriched-index.json
-llm-enrichment/enriched_json/*.json
-llm-enrichment/responses/<model-slug>/*.json
-llm-enrichment/keyword-prefilter.json
-llm-enrichment/summary.json
+flow-manifest.json                      run configuration and stages
+enrichment/config.json                  preset, provider, model, and safety scope
+enrichment/enriched.csv                 flattened rows
+enrichment/enriched-index.json          flattened rows plus artifact pointers
+enrichment/enriched_json/<case>.json    validated structured output
+enrichment/responses/<model>/<case>.json raw text, errors, validation, usage
+enrichment/summary.json                 counts, cost, timestamps, output paths
 ```
 
-## Required enriched JSON sections
-
-Strict usable output must include:
-
-- `source_record_id`
-- `canonical_name`
-- `domain`
-- `website_url`
-- `logo_url`
-- `type`
-- `verification`
-- `profile`
-- `capital_profile`
-- `portfolio_signals`
-- `outreach`
-- `compliance`
-- `source_evidence`
-- `quality`
-
-The strict parser also requires:
-
-- `verification.is_capital_source` as a boolean.
-- `verification.status` as a string.
-- `profile` as an object.
-- `capital_profile` as an object.
-
-Provider envelopes, partial JSON, and truncated reasoning are not accepted as enriched records.
-
-## Rejected entity contract
-
-If an entity is not a valid target:
-
-```json
-{
-  "type": "not_lp_target",
-  "verification": {
-    "is_capital_source": false,
-    "status": "rejected",
-    "rationale": "One sentence max."
-  }
-}
-```
-
-Unknown fields should remain `unknown` rather than guessed.
+An invalid result can have a response artifact without an enriched JSON artifact. Consumers should require `ok=true` in `enriched-index.json` before import.
