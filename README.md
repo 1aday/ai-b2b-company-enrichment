@@ -1,223 +1,264 @@
-# Capital Source Enrichment
+![AI B2B Company Enrichment](docs/assets/project-hero.png)
 
-Scrape-first enrichment workflow for identifying entities that are plausible capital sources for VC funds, emerging managers, private funds, fund-of-funds, and alternative investment vehicles.
+# AI B2B Company Enrichment
 
-The core idea is simple: scrape and store source material cheaply, organize it into clean Markdown packets, then test different LLMs against the same packet corpus until you find the best cost/quality tradeoff.
+[![CI](https://github.com/1aday/ai-b2b-company-enrichment/actions/workflows/ci.yml/badge.svg)](https://github.com/1aday/ai-b2b-company-enrichment/actions/workflows/ci.yml)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-17201d?logo=typescript&logoColor=white)
+![Node](https://img.shields.io/badge/Node.js-22%2B-176b5c?logo=nodedotjs&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-16-17201d?logo=nextdotjs&logoColor=white)
+![Fixture cost](https://img.shields.io/badge/sample_cost-%240-d7f253?labelColor=17201d)
+![Account level](https://img.shields.io/badge/scope-company_accounts_only-f07b4f?labelColor=17201d)
+[![License: MIT](https://img.shields.io/badge/license-MIT-6a5bd2)](LICENSE)
 
-## Why this exists
+Turn a CSV of company accounts into structured, evidence-backed B2B intelligence. The pipeline collects first-party website evidence, builds auditable Markdown packets, runs a strict enrichment schema, optionally qualifies each account against an ICP, and preserves the evidence behind every material claim.
 
-Most enrichment systems burn tokens too early. They send messy CSV rows and half-scraped context directly to an expensive model, then make it hard to audit why fields were filled.
+The default product is general company enrichment. The original capital-source qualification workflow remains available as a preset instead of being discarded.
 
-This project separates the workflow into durable stages:
+> **Public demo:** the dashboard is a static sample workspace built from fictional companies. It has no API routes, accepts no keys, cannot start paid model calls, and exposes no local run paths. The verified Vercel preview URL will be added after the deployment scope is selected.
 
-1. Scrape first-party source pages and store them locally as Markdown.
-2. Clean and organize the scraped content per entity.
-3. Skip empty or obviously irrelevant packets before any LLM spend.
-4. Run cheap model candidates against the same packet format.
-5. Validate full JSON shape before treating an output as enriched truth.
-6. Preserve raw responses, packet paths, scrape files, and cost metrics for audit and retry.
+## What comes out
 
-## Validated status
+Each company record contains:
 
-The cleaned standalone workflow was tested end-to-end on 20 real CSV entities.
+- identity and canonical website details;
+- firmographics with explicit unknowns;
+- products, services, target customers, and value proposition;
+- conservative commercial, hiring, technology, and event signals;
+- optional ICP qualification with matched criteria, gaps, and disqualifiers;
+- cautious account-level outreach context;
+- field-level source evidence and confidence;
+- quality, coverage, missing-field, and review flags.
 
-- TypeScript compile: passed.
-- Scrape step: 20 of 20 entities completed.
-- Packet prep: 20 packets created.
-- LLM prefilter: 6 skipped before spend.
-- LLM calls: 14 completed.
-- Strict JSON parse: 14 of 14 usable.
-- Bad/truncated JSON: 0.
-- Test cost: `$0.074603`.
+If no ICP is supplied, the contract requires:
 
-Latest local test output:
-
-```text
-runs/cleaned-flow-20-20260604T0028/
+```json
+{
+  "qualification": {
+    "status": "not_scored",
+    "icp_score": null,
+    "rationale": "No ICP was supplied, so the company was not scored."
+  }
+}
 ```
 
-## Features
+No score is fabricated.
 
-- CSV-driven entity workflow.
-- First-party website scraping with same-domain nav discovery.
-- Per-company Markdown storage with page name and page path.
-- Deterministic logo extraction with favicon fallback.
-- Deterministic address and postal-code hints.
-- LLM-ready packet generation with clean first-party and third-party sections.
-- Empty-content and keyword prefilters before LLM calls.
-- OpenRouter-compatible chat model support.
-- Strict enriched JSON validation.
-- Raw provider-response retention for audit.
-- Cost and latency reporting.
-- Local progress UI under `ui/`.
-- Screen-based long-run helper for local machines.
-- Rollback helper for the cleanup migration.
-- Local rollback support for the pre-cleanup workspace.
+## Try it free
 
-## Quickstart
+Requirements: Node.js 22 or newer.
 
 ```bash
-npm install
-cp .env.example .env.local
+npm ci
+npm run fixture
 ```
 
-Set:
+That command runs a deterministic prepared packet through the complete company schema and writes a validated CSV and JSON record. It makes no network request and costs `$0`.
+
+Try the same packet with an explicit ICP:
 
 ```bash
-OPENROUTER_API_KEY=...
+npm run fixture:icp
 ```
 
-Run a full enrichment flow:
+Confirm the preserved capital-source contract:
+
+```bash
+npm run fixture:capital-source
+```
+
+Launch the static sample dashboard:
+
+```bash
+cd ui
+npm ci
+npm run dev
+```
+
+Open `http://localhost:3210`.
+
+## Input
+
+Only four CSV columns are required:
+
+```csv
+source_record_id,company_name,domain,website_url
+acct-001,Northstar Cloud,northstarcloud.example,https://northstarcloud.example
+```
+
+Additional columns are preserved under `source_context` and copied into the flattened output with a `source_` prefix. They are context, not assumed truth.
+
+This is an account-level system. It does not discover people, personal email addresses, or other personal contact data.
+
+## Run real enrichment
+
+Create `.env.local`:
+
+```bash
+OPENROUTER_API_KEY=your_key_here
+```
+
+Run the default company preset:
 
 ```bash
 npm run flow -- \
-  --input=/path/to/entities.csv \
-  --run-id=capital-source-$(date +%Y%m%d-%H%M%S) \
-  --limit=100 \
-  --scrape-concurrency=12 \
-  --enrich-concurrency=4 \
-  --max-nav-pages=0
+  --input=/absolute/path/to/companies.csv \
+  --provider=openrouter \
+  --model=openai/gpt-4.1-mini \
+  --limit=20
 ```
 
-Run a long local job in `screen`:
+Add ICP scoring:
 
 ```bash
-npm run flow:screen -- \
-  --input=/path/to/entities.csv \
-  --limit=1000 \
-  --max-nav-pages=0
+npm run flow -- \
+  --input=/absolute/path/to/companies.csv \
+  --provider=openrouter \
+  --icp=/absolute/path/to/icp.json \
+  --limit=20
 ```
 
-Run the progress UI:
+Run the original capital-source workflow:
 
 ```bash
-npm run ui
+npm run flow:capital-source -- \
+  --input=/absolute/path/to/companies.csv \
+  --provider=openrouter \
+  --limit=20
 ```
 
-## CSV input
+Use `--dry-run=true` to inspect the planned commands without scraping or calling a model.
 
-Minimum useful columns:
+## Preset contract
+
+Every preset supplies the same six kinds of behavior:
+
+| Interface | Company preset | Capital-source preset |
+| --- | --- | --- |
+| Schema | General B2B company record | Original allocator record |
+| Prompt | Account intelligence | VC capital-source qualification |
+| Validation | Evidence + ICP invariants | Preserved verification/profile contract |
+| Keyword filter | Disabled by default | Allocator gate enabled |
+| CSV mapping | Company and qualification fields | Original flattened capital fields |
+| Benchmarks | Identity, offering, signals, evidence | Allocator status and capital appetite |
+
+The active definitions live in [`src/presets/`](src/presets/).
+
+## Architecture
 
 ```text
-source_record_id,company_name,domain,website_url,city,state,country
+company CSV
+    │
+    ▼
+website scraper ──► raw Markdown + source metadata
+    │
+    ▼
+packet builder ───► ranked first-party evidence packet
+    │
+    ▼
+preset ───────────► schema + prompt + validation + CSV mapping
+    │
+    ├── fixture provider ─────► deterministic, free validation
+    └── OpenRouter provider ──► real model enrichment + retry
+                                │
+                                ▼
+                 JSON + CSV + raw response + cost summary
 ```
 
-Sample:
+Stages are deliberately durable. A failed model response can be inspected or retried without paying to scrape the company again.
 
-```bash
-cat examples/input.sample.csv
-```
-
-The workflow can tolerate extra columns. Existing CSV values are treated as identity and hints, not final truth.
-
-## Commands
-
-```bash
-npm run flow
-npm run flow:screen
-npm run scrape
-npm run packets
-npm run enrich
-npm run benchmark
-npm run verify:benchmark
-npm run ui
-npm run typecheck
-npm run restore:pre-cleanup
-```
-
-## Run steps separately
-
-Scrape only:
-
-```bash
-npm run scrape -- --input=/path/to/entities.csv --limit=100
-```
-
-Prepare packets from a scrape run:
-
-```bash
-npm run packets -- --run-dir=/path/to/scrape-run
-```
-
-Enrich prepared packets:
-
-```bash
-npm run enrich -- \
-  --packet-root=/path/to/prepared_for_llm \
-  --model=nvidia/nemotron-3-super-120b-a12b
-```
+See [architecture](docs/architecture.md), [output contract](docs/output-contract.md), and [operations](docs/operations.md) for the detailed design.
 
 ## Output layout
 
 ```text
 runs/<run-id>/
   flow-manifest.json
-  scrape_markdown.log
-  prepare_llm_packets.log
-  llm_enrichment.log
+  scrape_company_websites.log
+  prepare_evidence_packets.log
+  enrich_accounts.log
   scrape-runs/<run-id>-scrape/
     markdown/<company>/*.md
     markdown/<company>/_company_index.json
     prepared_for_llm/<company>/llm_input.md
     prepared_for_llm/<company>/llm_input.json
-  llm-enrichment/
+  enrichment/
+    config.json
     enriched.csv
     enriched-index.json
-    enriched_json/*.json
-    responses/<model-slug>/*.json
-    keyword-prefilter.json
+    enriched_json/<company>.json
+    responses/<model>/<company>.json
     summary.json
 ```
 
-## Quality rules
+Old generated run artifacts keep their original paths and are not migrated or rewritten.
 
-- First-party scraped pages are primary evidence.
-- Third-party pages are secondary evidence when present.
-- CSV/list labels are not final enrichment truth.
-- Unknown beats guessing.
-- Rejection reason must be one sentence max.
-- Valid targets must appear able and likely to commit capital to VC funds, emerging managers, private funds, fund-of-funds, or alternative investment vehicles.
-- Non-targets must be marked `verification.is_capital_source=false`, `verification.status=rejected`, and `type=not_lp_target`.
-- Full enriched JSON must pass strict shape validation before import.
+## Validation evidence
 
-## Cost controls
+Validated on 2026-09-04 from a clean feature branch:
 
-- Scraping and packet prep cost no LLM tokens.
-- Empty packets are skipped before model calls.
-- Keyword prefiltering skips obvious no-signal packets.
-- Model, concurrency, timeouts, retry count, and max output tokens are configurable.
-- Raw responses are retained so parser failures can be audited without repaying for the same context.
+| Check | Result |
+| --- | --- |
+| Root strict TypeScript | Passed |
+| Automated contract tests | 9 passed, 0 failed |
+| Company fixture without ICP | Passed; `not_scored`, `null`, `$0` |
+| Company fixture with ICP | Passed; explicit scored fixture, `$0` |
+| Capital-source fixture | Passed through preserved preset, `$0` |
+| Company and capital-source dry runs | Passed |
+| Generic benchmark preparation | Passed offline |
+| Next.js production build | Passed; static `/` route |
+| UI dependency audit | 0 known vulnerabilities after upgrading to Next.js 16.3.4 |
+| Repository hero | Verified PNG, 1280×640 |
 
-## Documentation
+The tests cover missing websites, empty scrapes, malformed JSON, provider retry classification, evidence requirements, ICP/no-ICP invariants, and preservation of extra CSV context.
 
-- `docs/architecture.md`: system design and data flow.
-- `docs/csv-llm-flow.md`: command-level workflow.
-- `docs/output-contract.md`: output files and JSON shape.
-- `docs/model-selection.md`: cheap-model benchmarking guidance.
-- `docs/operations.md`: production runbook.
-- `docs/evaluation.md`: quality and test notes.
-- `docs/troubleshooting.md`: common failures and fixes.
-- `docs/github-readiness.md`: current repo-readiness status.
-- `docs/cleanup-and-rollback.md`: rollback policy.
-
-## Rollback
-
-Before the standalone cleanup, a local rollback snapshot was written under `.cleanup-backups/`.
-
-Restore the cleanup snapshot:
+Run the same checks:
 
 ```bash
-npm run restore:pre-cleanup
+npm run typecheck
+npm test
+npm run fixture
+npm run fixture:icp
+npm run fixture:capital-source
+npm run flow -- --input=examples/input.sample.csv --dry-run=true --limit=2
+npm run ui:build
 ```
 
-Or restore manually:
+## Cost model
 
-```bash
-tar -xzf .cleanup-backups/<snapshot>/source-config-docs.tgz
-```
+- Scraping, packet preparation, validation, and the fixture provider do not consume model tokens.
+- OpenRouter cost is calculated from prompt/completion usage and the configured per-token rates.
+- Empty packets are stopped before model execution.
+- Raw responses are retained so parser failures can be diagnosed without hiding provider behavior.
+- Paid-model benchmark cells remain unclaimed until a real key-backed run produces evidence.
 
-The backup is intentionally ignored by git.
+## Limitations
+
+- JavaScript-heavy, blocked, parked, or incorrect websites can produce empty evidence packets.
+- Company size and revenue are left blank when first-party evidence is insufficient.
+- Commercial signals are evidence summaries, not proof of buying intent.
+- ICP scores depend on the quality and specificity of the supplied ICP.
+- The scraper does not bypass authentication, CAPTCHAs, paywalls, or access controls.
+- OpenRouter behavior, model availability, and prices can change; validate before scaling.
+
+## Data safety
+
+- Public fixtures use fictional `.example` companies.
+- Secrets belong only in ignored `.env.local` files.
+- The sample dashboard is static and cannot access local artifacts.
+- The output schema is company/account-level and excludes personal contacts.
+- Source URLs and raw provider responses are stored for audit, so production operators should apply their own retention policy.
+- Never commit real customer lists or generated production runs.
+
+## Repository map
+
+- [`src/run-company-enrichment-flow.ts`](src/run-company-enrichment-flow.ts) — orchestration
+- [`src/scrape-company-websites.ts`](src/scrape-company-websites.ts) — first-party collection
+- [`src/prepare-company-llm-packets.ts`](src/prepare-company-llm-packets.ts) — evidence packet construction
+- [`src/enrich-company-packets.ts`](src/enrich-company-packets.ts) — fixture/OpenRouter execution
+- [`src/presets/`](src/presets/) — schema, prompt, filters, validation, mapping, benchmarks
+- [`examples/fixtures/`](examples/fixtures/) — deterministic, fictional inputs and outputs
+- [`ui/`](ui/) — static sample dashboard
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See [LICENSE](LICENSE).
