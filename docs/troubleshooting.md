@@ -1,70 +1,35 @@
 # Troubleshooting
 
-## Many packets skipped as empty
+## Input rejected
 
-Likely cause:
+Confirm every row has `source_record_id`, `company_name`, `domain`, and `website_url`. Blank values are reported with their CSV row number.
 
-- Scrape could not fetch useful site content.
-- Site blocks bots or requires JavaScript.
-- Domain is wrong, parked, or redirected.
+## Empty evidence packet
 
-What to inspect:
+Inspect the company Markdown directory and `_quality_report.json`. Common causes are a wrong domain, parked site, bot blocking, JavaScript-only content, redirects, or thin pages. Fix collection before changing the model prompt.
 
-```text
-prepared_for_llm/_quality_report.json
-llm-enrichment/keyword-prefilter.json
-scrape-runs/<run-id>-scrape/markdown/<company>/
-```
+## OpenRouter key missing
 
-## A single site stalls the scraper
+`--provider=openrouter` requires `OPENROUTER_API_KEY` in the shell or ignored `.env.local`. `--provider=fixture` never requires a key.
 
-Use or lower:
+## Provider response malformed
 
-```bash
---max-entity-ms=120000
-```
+Inspect `enrichment/responses/<model>/<case>.json`. Reduce packet size, allow more output tokens, or select a model with reliable JSON-schema support. Do not import the result unless preset validation passes.
 
-The scraper records an entity-timeout source result instead of blocking the whole run.
+## Rate limit or server failure
 
-## Model returns non-JSON
+Status `429`, timeouts, connection failures, and `5xx` errors are retryable. Increase `--retries` cautiously and reduce concurrency. Invalid `4xx` requests are not retried.
 
-Try:
+## Unexpected ICP result
+
+Review the exact ICP JSON and cited evidence. A score should be treated as a transparent comparison to those supplied criteria, not objective company quality or buying intent. If no ICP was supplied, any score is a validation error.
+
+## Dashboard build
 
 ```bash
---retries=4
---max-output-tokens=16000
---prepare-max-total-chars=100000
---prepare-max-chars-per-page=40000
+cd ui
+npm ci
+npm run build
 ```
 
-Also inspect:
-
-```text
-llm-enrichment/responses/<model-slug>/
-```
-
-## Model response is truncated
-
-Symptoms:
-
-- Provider response has `finish_reason=length`.
-- Stored response is a provider envelope rather than final enriched object.
-- Strict parser blocks it.
-
-Fixes:
-
-- Increase `--max-output-tokens`.
-- Reduce packet size.
-- Use a model with stronger long-context JSON behavior.
-
-## Too many false positives
-
-Tighten the system prompt around fund-commitment evidence. Direct investing, GP activity, advisory work, brokerage, wealth language, or operating-company activity should not be enough unless the scraped content supports commitment to funds, managers, or alternative vehicles.
-
-## Too many false negatives
-
-Broaden valid-target wording and keyword prefilter terms. Prefer a few false matches before LLM over missing plausible allocators.
-
-## Address contains footer noise
-
-Inspect the source page summary and markdown. Address extraction is deterministic and conservative, but some pages collapse footer/contact text into one line. Treat deterministic address as a hint unless the final LLM JSON supports it.
+The production route should be static. If a server route appears, check that no local-artifact APIs or model execution endpoints were reintroduced.

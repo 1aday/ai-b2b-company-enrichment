@@ -42,7 +42,7 @@
     "benchmark:capital-source": "tsx src/benchmark-site-md-models.ts --preset=capital-source",
     "verify:benchmark": "tsx src/verify-site-md-benchmark.ts",
     "ui": "cd ui && npm run dev",
-    "ui:build": "cd ui && npm ci && npm run build",
+    "ui:build": "cd ui && npm ci && env -u NODE_ENV npm run build",
     "restore:pre-cleanup": "bash scripts/restore-cleanup-backup.sh",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/tests/*.test.ts"

@@ -1,6 +1,6 @@
 # Cleanup and rollback
 
-This repository was reduced from a broad experiment workspace into a standalone enrichment workflow.
+This repository was reduced from a broad experiment workspace into a standalone enrichment workflow, then generalized through presets without rewriting the historical cleanup checkpoint.
 
 ## Active surface
 
@@ -9,9 +9,11 @@ Active source files live in `src/` and support:
 - CSV entity scraping.
 - Markdown storage.
 - LLM packet preparation.
-- OpenRouter-compatible enrichment.
+- Fixture and OpenRouter-compatible enrichment.
 - Strict response validation.
 - Cheap-model benchmarking.
+- General company enrichment with optional ICP scoring.
+- Preserved capital-source qualification.
 
 Historical experiments are preserved by the local rollback snapshot, not by the public active source tree.
 

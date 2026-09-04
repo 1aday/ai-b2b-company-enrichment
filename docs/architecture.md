@@ -1,106 +1,71 @@
 # Architecture
 
-Capital Source Enrichment is a staged local workflow. Each stage writes durable artifacts so failures can be inspected and retried without repeating earlier work.
+The system separates collection, evidence preparation, model execution, and validation so each stage can be inspected and retried independently.
 
 ## Data flow
 
 ```text
-CSV
+CSV rows
+  -> validate four required identity fields
+  -> preserve all additional columns as source context
   -> scrape first-party website pages
-  -> store Markdown and source metadata
-  -> build clean LLM packets
-  -> skip empty or low-signal packets
-  -> call OpenRouter-compatible model
-  -> validate strict enriched JSON
-  -> write JSON, CSV, responses, summary
+  -> store raw Markdown and source metadata
+  -> remove noise, rank pages, and build evidence packets
+  -> select company or capital-source preset
+  -> execute deterministic fixture or OpenRouter provider
+  -> validate schema and cross-field invariants
+  -> write JSON, CSV, raw response, usage, and summary
 ```
 
-## Stages
+## Components
 
-### 1. Scrape
+### Orchestrator
 
-Entrypoint:
+`src/run-company-enrichment-flow.ts` owns the run directory and manifest. `--provider=fixture` bypasses scraping and uses bundled packets. `--provider=openrouter` runs all three durable stages.
 
-```text
-src/enrich-investor-companies-master.ts
-```
+### Website collection
 
-Responsibilities:
+`src/scrape-company-websites.ts` validates the input contract, collects same-domain first-party pages, records fetch failures, and stores Markdown plus a per-company source index. It does not bypass access controls.
 
-- Read CSV entities.
-- Resolve homepage/domain URLs.
-- Scrape homepage/domain-root pages.
-- Discover same-domain navigation links.
-- Store per-page Markdown with frontmatter.
-- Extract logo candidates, favicon candidates, address hints, and postal-code hints.
-- Write `_company_index.json` per company.
+### Packet builder
 
-### 2. Prepare packets
+`src/prepare-company-llm-packets.ts` removes repeated navigation chrome, thin pages, error pages, legal pages, and duplicates. It ranks useful sources and writes a bounded Markdown/JSON packet with first- and third-party sources separated.
 
-Entrypoint:
+### Presets
 
-```text
-src/prepare-company-llm-packets.ts
-```
+`src/presets/` is the product boundary. A preset defines:
 
-Responsibilities:
+- strict output schema;
+- evidence and extraction prompt;
+- keyword-gate configuration;
+- benchmark field weights;
+- output validation;
+- flattened CSV mapping.
 
-- Read scraped Markdown folders.
-- Drop noisy pages such as legal pages, account flows, duplicates, and very thin pages.
-- Preserve full useful content for LLM reasoning.
-- Separate first-party and third-party sections.
-- Write `llm_input.md` and `llm_input.json`.
-- Write `_quality_report.json`.
+The `company` preset is the default. `capital-source` imports the original schema and field contract.
 
-### 3. Enrich
+### Providers
 
-Entrypoint:
+`fixture` reads a checked-in deterministic response beside a prepared packet. It never uses a key or network request.
 
-```text
-src/enrich-prepared-packets.ts
-```
+`openrouter` sends the preset schema and evidence packet to an OpenRouter-compatible chat-completions endpoint. It records raw text, usage, latency, calculated cost, and validation errors.
 
-Responsibilities:
+### Dashboard
 
-- Load prepared packets.
-- Skip packets with no usable content.
-- Apply high-recall keyword prefilter.
-- Call the configured model through an OpenRouter-compatible chat endpoint.
-- Retry malformed responses.
-- Validate strict enriched JSON.
-- Store raw provider responses and parsed output.
-- Write CSV/index/summary files.
+`ui/` is a static Next.js product demo. Its data is imported from `ui/data/demo.ts`; no API route or server action is present. The interaction simulates the deterministic pipeline locally in the browser and cannot start a model call.
 
-### 4. Orchestrate
+## Trust boundaries
 
-Entrypoint:
+| Boundary | Rule |
+| --- | --- |
+| CSV | Identity hint and preserved source context, not final truth |
+| First-party pages | Preferred evidence for company claims |
+| Third-party pages | Secondary context, labelled separately |
+| Model output | Untrusted until parsing and preset validation pass |
+| ICP | Optional, explicit criteria only |
+| Unknown data | Empty, `null`, or review flag; never guessed |
+| Person data | Outside the product contract |
 
-```text
-src/run-csv-scrape-enrich-flow.ts
-```
+## Retry design
 
-Responsibilities:
-
-- Run scrape, prepare, and enrich as one flow.
-- Write step logs.
-- Maintain `flow-manifest.json`.
-- Support `--dry-run=true` for no-cost orchestration checks.
-
-## Source files
-
-```text
-src/run-csv-scrape-enrich-flow.ts
-src/enrich-investor-companies-master.ts
-src/prepare-company-llm-packets.ts
-src/enrich-prepared-packets.ts
-src/markdown-scrape.ts
-src/schema.ts
-src/field-contract.ts
-src/shared.ts
-src/benchmark-site-md-models.ts
-src/verify-site-md-benchmark.ts
-```
-
-## Experiment boundary
-
-Pre-cleanup experiments are not part of the public active workflow. The local rollback archive can restore them if needed, but package scripts and TypeScript config only target the standalone workflow.
+Scraping and packet preparation are durable. Only transport failures, timeouts, rate limits, and provider server errors are retryable by the model executor. Invalid requests fail immediately. Malformed successful responses are retained and fail validation rather than silently entering the output CSV as truth.
