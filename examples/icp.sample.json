@@ -1,0 +1,11 @@
+{
+  "name": "North American cloud software",
+  "description": "B2B software companies selling cloud operations products in Canada or the United States.",
+  "target_industries": ["Cloud infrastructure software", "Developer tools"],
+  "target_geographies": ["Canada", "United States"],
+  "business_models": ["b2b"],
+  "employee_count_min": 20,
+  "employee_count_max": 500,
+  "must_have_signals": ["Cloud operations product", "B2B software"],
+  "disqualifiers": ["Consumer-only business"]
+}
